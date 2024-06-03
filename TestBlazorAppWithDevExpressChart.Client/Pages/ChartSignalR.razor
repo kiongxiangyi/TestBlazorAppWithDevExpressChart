@@ -1,0 +1,62 @@
+﻿@page "/chart"
+@rendermode InteractiveWebAssembly
+@using Microsoft.AspNetCore.SignalR.Client
+@using System.Collections.ObjectModel
+@inject NavigationManager Navigation
+
+<PageTitle>Weather Chart</PageTitle>
+
+@if (forecasts.Count == 0)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <DxChart Data="@forecasts">
+        <DxChartBarSeries ArgumentField="@((WeatherForecast i) => i.Date)"
+                          ValueField="@((WeatherForecast i) => i.Precipitation)"
+                          Name="Precipitation">
+        </DxChartBarSeries>
+        <DxChartLineSeries ArgumentField="@((WeatherForecast i) => i.Date)"
+                           ValueField="@((WeatherForecast i) => i.TemperatureC)"
+                           Name="Temperature">
+        </DxChartLineSeries>
+    </DxChart>
+}
+
+@code {
+    private ObservableCollection<WeatherForecast> forecasts = new ObservableCollection<WeatherForecast>();
+    private HubConnection hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Initializing SignalR connection...");
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/weatherHub"))
+            .Build();
+
+        hubConnection.On<WeatherForecast>("ReceiveWeatherUpdate", (forecast) =>
+        {
+            Console.WriteLine($"Received update: {forecast.Date}, {forecast.TemperatureC}C, {forecast.Precipitation}mm");
+            forecasts.Add(forecast);
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            await hubConnection.StartAsync();
+            Console.WriteLine("SignalR connection started.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error starting SignalR connection: {ex.Message}");
+        }
+    }
+
+    public class WeatherForecast
+    {
+        public DateTime Date { get; set; }
+        public int TemperatureC { get; set; }
+        public double Precipitation { get; set; }
+    }
+}
